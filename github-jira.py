@@ -1,19 +1,16 @@
-from flask import Flask, request
-from requests.auth import HTTPBasicAuth
-import requests
-import json
-import os
-from dotenv import load_dotenv
-
-# Load .env variables
-load_dotenv()
-
-app = Flask(__name__)
-
 @app.route('/createJira', methods=['POST'])
 def createJira():
-    url = "https://anjanashaju1997.atlassian.net/rest/api/3/issue"
+    data = request.get_json()
 
+    # Log the payload for debugging
+    print("GitHub payload:", json.dumps(data, indent=2))
+
+    # Extract GitHub issue title and body
+    issue_title = data.get('issue', {}).get('title', 'No title')
+    issue_body = data.get('issue', {}).get('body', 'No description')
+
+    # Jira config
+    url = "https://anjanashaju1997.atlassian.net/rest/api/3/issue"
     email = os.getenv("JIRA_EMAIL")
     api_token = os.getenv("JIRA_API_TOKEN")
     auth = HTTPBasicAuth(email, api_token)
@@ -23,32 +20,36 @@ def createJira():
         "Content-Type": "application/json"
     }
 
-    payload = json.dumps({
+    # Construct the Jira issue payload
+    payload = {
         "fields": {
-            "description": {
-                "content": [{
-                    "content": [{
-                        "text": "Order entry fails when selecting supplier.",
-                        "type": "text"
-                    }],
-                    "type": "paragraph"
-                }],
-                "type": "doc",
-                "version": 1
-            },
             "project": {
-                "key": "AB"
+                "key": "AB"  # Replace with your actual Jira project key
+            },
+            "summary": issue_title,
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [{
+                    "type": "paragraph",
+                    "content": [{
+                        "type": "text",
+                        "text": issue_body
+                    }]
+                }]
             },
             "issuetype": {
-                "id": "10006"
-            },
-            "summary": "Main order flow broken"
-        },
-        "update": {}
-    })
+                "id": "10006"  # Replace with actual issue type ID (e.g., Task or Bug)
+            }
+        }
+    }
 
-    response = requests.post(url, data=payload, headers=headers, auth=auth)
-    return json.dumps(json.loads(response.text), indent=4)
+    # Send request to Jira
+    response = requests.post(url, headers=headers, auth=auth, json=payload)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Log response
+    print("Jira response:", response.status_code, response.text)
+
+    return json.dumps(response.json(), indent=4)
+
+  
